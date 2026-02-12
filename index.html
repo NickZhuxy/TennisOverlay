@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Squash-Tennis Serve Trajectory Visualizer</title>
+<style>
+:root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-border: #334155;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --accent: #f59e0b;
+    --tennis-green: #22c55e;
+    --squash-blue: #3b82f6;
+    --danger: #ef4444;
+    --success: #22c55e;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: var(--panel);
+    border-right: 1px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar h1 {
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--panel-border);
+    line-height: 1.4;
+}
+
+.section {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.input-row label {
+    flex: 1;
+    color: var(--text-muted);
+}
+
+.input-row input[type="number"] {
+    width: 72px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 13px;
+    text-align: right;
+}
+
+.input-row .unit {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-left: 4px;
+    min-width: 20px;
+}
+
+.computed-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 4px;
+    color: var(--text-muted);
+}
+
+.computed-row .val {
+    color: var(--text);
+    font-weight: 500;
+}
+
+.arrow-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 4px;
+    width: 140px;
+    margin: 0 auto;
+}
+
+.arrow-btn {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    width: 40px;
+    height: 36px;
+}
+
+.arrow-btn:hover { background: var(--panel-border); }
+.arrow-btn:active { background: #475569; }
+.arrow-btn.empty { visibility: hidden; }
+
+select {
+    width: 100%;
+    margin-top: 8px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.result-box {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 12px;
+    border: 1px solid var(--panel-border);
+}
+
+.result-main {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.result-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+}
+
+.result-diff {
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--panel-border);
+}
+
+.result-diff.above { color: var(--success); }
+.result-diff.below { color: var(--danger); }
+
+.camera-btns {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.cam-btn {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.cam-btn:hover { background: var(--panel-border); }
+
+.hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-top: 6px;
+}
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.toggle-row input { accent-color: var(--squash-blue); cursor: pointer; }
+
+#canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+#canvas-container canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.click-hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+@media (max-width: 768px) {
+    body { flex-direction: column; }
+    .sidebar { width: 100%; min-width: unset; max-height: 280px; }
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h1>Serve Trajectory Visualizer</h1>
+
+    <div class="section">
+        <div class="section-title">Player</div>
+        <div class="input-row">
+            <label>Height</label>
+            <input type="number" id="player-height" value="185" min="140" max="220" step="1">
+            <span class="unit">cm</span>
+        </div>
+        <div class="input-row">
+            <label>Jump gain</label>
+            <input type="number" id="jump-gain" value="0" min="0" max="50" step="1">
+            <span class="unit">cm</span>
+        </div>
+        <div class="input-row">
+            <label>Serve speed</label>
+            <input type="number" id="serve-speed" value="120" min="80" max="260" step="5">
+            <span class="unit">km/h</span>
+        </div>
+        <div class="input-row">
+            <label>Topspin</label>
+            <input type="number" id="topspin" value="1000" min="0" max="5000" step="100">
+            <span class="unit">rpm</span>
+        </div>
+        <div class="input-row">
+            <label>Min net clearance</label>
+            <input type="number" id="min-clearance" value="20" min="1" max="200" step="1">
+            <span class="unit">cm</span>
+        </div>
+        <div class="input-row">
+            <label>Serve angle</label>
+            <input type="number" id="serve-angle" value="-5.0" min="-45" max="15" step="0.5">
+            <span class="unit">&deg;</span>
+        </div>
+        <div style="margin-top: 10px;">
+            <div class="computed-row">
+                <span>Standing reach</span>
+                <span class="val" id="comp-reach">2.44m</span>
+            </div>
+            <div class="computed-row">
+                <span>Contact height</span>
+                <span class="val" id="comp-contact">2.94m</span>
+            </div>
+            <div class="computed-row">
+                <span>Net clearance</span>
+                <span class="val" id="comp-clearance">--</span>
+            </div>
+            <div class="computed-row">
+                <span>Serve velocity</span>
+                <span class="val" id="comp-velocity">33.3 m/s</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Move Squash Court</div>
+        <div class="arrow-grid">
+            <div class="arrow-btn empty"></div>
+            <button class="arrow-btn" id="move-fwd" title="Forward (toward net)">&#9650;</button>
+            <div class="arrow-btn empty"></div>
+            <button class="arrow-btn" id="move-left" title="Left">&#9664;</button>
+            <button class="arrow-btn" id="move-reset" title="Reset" style="font-size:11px;">RST</button>
+            <button class="arrow-btn" id="move-right" title="Right">&#9654;</button>
+            <div class="arrow-btn empty"></div>
+            <button class="arrow-btn" id="move-back" title="Back (toward baseline)">&#9660;</button>
+            <div class="arrow-btn empty"></div>
+        </div>
+        <select id="alignment-select">
+            <option value="midpoint" selected>Between Net &amp; Service Line</option>
+            <option value="net">Front wall at Net</option>
+            <option value="serviceline">Front wall at Service Line</option>
+            <option value="baseline">Back wall at Baseline</option>
+        </select>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Result</div>
+        <div class="result-box" id="result-box">
+            <div style="color: var(--text-muted); font-size: 12px; font-style: italic;">
+                Click on the tennis baseline to place your serve position
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Camera</div>
+        <div class="camera-btns">
+            <button class="cam-btn" id="cam-default">Default</button>
+            <button class="cam-btn" id="cam-side">Side</button>
+            <button class="cam-btn" id="cam-top">Top</button>
+            <button class="cam-btn" id="cam-behind">Behind Server</button>
+        </div>
+        <div class="hint">Left-drag: orbit &middot; Scroll: zoom &middot; Right-drag: pan</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Layers</div>
+        <label class="toggle-row"><input type="checkbox" id="toggle-tennis" checked> Tennis Court</label>
+        <label class="toggle-row"><input type="checkbox" id="toggle-squash" checked> Squash Court</label>
+        <label class="toggle-row"><input type="checkbox" id="toggle-trajectory" checked> Trajectory</label>
+    </div>
+</div>
+
+<div id="canvas-container">
+    <div class="click-hint" id="click-hint">Step 1: Click on the tennis baseline to set your serve position</div>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ==================== CONSTANTS ====================
+const TENNIS = {
+    length: 23.77,
+    singlesWidth: 8.23,
+    doublesWidth: 10.97,
+    alleyWidth: 1.37,
+    netHeightCenter: 0.914,
+    netHeightPost: 1.07,
+    serviceLineFromNet: 6.40,
+};
+TENNIS.halfLength = TENNIS.length / 2; // 11.885 — net is at z=0, baselines at ±11.885
+TENNIS.serviceLineZ = TENNIS.serviceLineFromNet; // 6.40 from net on server side
+
+const SQUASH = {
+    length: 9.75,
+    width: 6.40,
+    shortLine: 5.44,
+    serviceBox: 1.60,
+    frontWallHeight: 4.57,
+    serviceLineHeight: 1.78,
+    tinHeight: 0.48,
+    backWallHeight: 2.13,
+};
+
+// Coordinate system: X = width, Y = up, Z = length
+// Net at Z = 0. Server's side: Z > 0. Opponent's side: Z < 0.
+// Court centered at X = 0.
+
+// Tennis ball physics constants
+const BALL = {
+    mass: 0.05803,       // kg (average tennis ball)
+    diameter: 0.06568,   // m
+    area: 0.0034,        // m² (cross-sectional)
+    CD: 0.507,           // drag coefficient (measured average)
+    CL: 0.21,            // lift coefficient (approximate for moderate spin)
+    radius: 0.06568 / 2, // m
+};
+const AIR = {
+    density: 1.21,       // kg/m³ at sea level ~20°C
+};
+const GRAVITY = 9.81;   // m/s²
+
+const STEP = 0.25; // movement step in meters
+
+// ==================== STATE ====================
+const state = {
+    // Squash court offset (front wall Z, center X)
+    squashOffsetX: 0, // centered
+    squashFrontWallZ: TENNIS.serviceLineZ / 2, // midpoint between net and service line
+    // Serve point (null = not placed)
+    servePoint: null, // {x} on tennis baseline
+    // Landing target (null = not placed)
+    landingPoint: null, // {x, z} on opponent's court
+    // Player params
+    playerHeight: 1.85,
+    jumpGain: 0,
+    serveSpeed: 33.33,   // m/s (120 km/h default, avg amateur)
+    topspin: 1000,       // rpm (avg amateur flat serve)
+    minClearance: 0.20,  // m (20cm minimum net clearance)
+    serveAngle: -5.0,    // degrees below horizontal (~5° for amateur flat serve)
+    // Dragging state
+    draggingWallDot: false,
+    justFinishedDrag: false,
+};
+
+// ==================== THREE.JS SETUP ====================
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f172a);
+
+const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 200);
+camera.position.set(12, 12, 20);
+camera.lookAt(0, 0, 5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(container.clientWidth, container.clientHeight);
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1, 5);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI / 2 - 0.02;
+controls.minDistance = 3;
+controls.maxDistance = 60;
+controls.update();
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(10, 20, 10);
+scene.add(dirLight);
+
+// Ground grid
+const gridHelper = new THREE.GridHelper(50, 50, 0x1e293b, 0x1e293b);
+gridHelper.position.y = -0.01;
+scene.add(gridHelper);
+
+// ==================== GROUPS ====================
+const tennisGroup = new THREE.Group();
+const squashGroup = new THREE.Group();
+const trajectoryGroup = new THREE.Group();
+scene.add(tennisGroup);
+scene.add(squashGroup);
+scene.add(trajectoryGroup);
+
+// ==================== HELPERS ====================
+function makeLine(points, color, linewidth) {
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color, linewidth: linewidth || 1 });
+    return new THREE.Line(geom, mat);
+}
+
+function makeLineOnGround(x1, z1, x2, z2, color, y) {
+    const Y = y || 0.005;
+    return makeLine([new THREE.Vector3(x1, Y, z1), new THREE.Vector3(x2, Y, z2)], color);
+}
+
+function makeDashedLine(points, color) {
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineDashedMaterial({ color, dashSize: 0.2, gapSize: 0.1, linewidth: 1 });
+    const line = new THREE.Line(geom, mat);
+    line.computeLineDistances();
+    return line;
+}
+
+// ==================== TENNIS COURT ====================
+function buildTennisCourt() {
+    const hw = TENNIS.doublesWidth / 2;   // 5.485
+    const shw = TENNIS.singlesWidth / 2;  // 4.115
+    const hl = TENNIS.halfLength;         // 11.885
+    const sl = TENNIS.serviceLineFromNet; // 6.40
+    const white = 0xffffff;
+    const Y = 0.005;
+
+    // Court surface
+    const surfGeom = new THREE.PlaneGeometry(TENNIS.doublesWidth, TENNIS.length);
+    const surfMat = new THREE.MeshStandardMaterial({ color: 0x1a5632, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    const surf = new THREE.Mesh(surfGeom, surfMat);
+    surf.rotation.x = -Math.PI / 2;
+    surf.position.set(0, 0, 0);
+    tennisGroup.add(surf);
+
+    // Lines
+    // Baselines
+    tennisGroup.add(makeLineOnGround(-hw, hl, hw, hl, white));
+    tennisGroup.add(makeLineOnGround(-hw, -hl, hw, -hl, white));
+    // Doubles sidelines
+    tennisGroup.add(makeLineOnGround(-hw, -hl, -hw, hl, white));
+    tennisGroup.add(makeLineOnGround(hw, -hl, hw, hl, white));
+    // Singles sidelines
+    tennisGroup.add(makeLineOnGround(-shw, -hl, -shw, hl, white));
+    tennisGroup.add(makeLineOnGround(shw, -hl, shw, hl, white));
+    // Service lines
+    tennisGroup.add(makeLineOnGround(-shw, sl, shw, sl, white));
+    tennisGroup.add(makeLineOnGround(-shw, -sl, shw, -sl, white));
+    // Center service line
+    tennisGroup.add(makeLineOnGround(0, -sl, 0, sl, white));
+    // Center marks
+    tennisGroup.add(makeLineOnGround(0, hl - 0.15, 0, hl, white));
+    tennisGroup.add(makeLineOnGround(0, -hl, 0, -hl + 0.15, white));
+
+    // Net
+    const netGeom = new THREE.PlaneGeometry(TENNIS.doublesWidth, TENNIS.netHeightCenter);
+    const netMat = new THREE.MeshStandardMaterial({
+        color: 0xcccccc, transparent: true, opacity: 0.3, side: THREE.DoubleSide, wireframe: false
+    });
+    const net = new THREE.Mesh(netGeom, netMat);
+    net.position.set(0, TENNIS.netHeightCenter / 2, 0);
+    tennisGroup.add(net);
+
+    // Net top line (cable)
+    const netCablePoints = [];
+    const segments = 20;
+    for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const x = -hw + t * TENNIS.doublesWidth;
+        // Catenary-like sag: higher at posts, lower at center
+        const sag = TENNIS.netHeightPost - (TENNIS.netHeightPost - TENNIS.netHeightCenter) * Math.sin(t * Math.PI);
+        netCablePoints.push(new THREE.Vector3(x, sag, 0));
+    }
+    tennisGroup.add(makeLine(netCablePoints, 0xffffff, 2));
+
+    // Net posts
+    const postGeom = new THREE.CylinderGeometry(0.04, 0.04, TENNIS.netHeightPost, 8);
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+    const postL = new THREE.Mesh(postGeom, postMat);
+    postL.position.set(-hw, TENNIS.netHeightPost / 2, 0);
+    tennisGroup.add(postL);
+    const postR = new THREE.Mesh(postGeom, postMat);
+    postR.position.set(hw, TENNIS.netHeightPost / 2, 0);
+    tennisGroup.add(postR);
+}
+
+// ==================== SQUASH COURT ====================
+function buildSquashCourt() {
+    // Clear old
+    while (squashGroup.children.length) squashGroup.remove(squashGroup.children[0]);
+
+    const S = SQUASH;
+    const hw = S.width / 2;
+    const frontMat = new THREE.MeshStandardMaterial({
+        color: 0xef4444, transparent: true, opacity: 0.2, side: THREE.DoubleSide
+    });
+    const lineMat = 0x60a5fa;
+    const Y = 0.006;
+
+    // Front wall (at z = 0 in local coords, full height)
+    const fwGeom = new THREE.PlaneGeometry(S.width, S.frontWallHeight);
+    const fw = new THREE.Mesh(fwGeom, frontMat);
+    fw.position.set(0, S.frontWallHeight / 2, 0);
+    squashGroup.add(fw);
+
+    // Floor lines
+    // Short line
+    squashGroup.add(makeLineOnGround(-hw, S.shortLine, hw, S.shortLine, lineMat, Y));
+    // Half court line
+    squashGroup.add(makeLineOnGround(0, S.shortLine, 0, S.length, lineMat, Y));
+    // Service boxes
+    squashGroup.add(makeLineOnGround(-hw, S.shortLine, -hw + S.serviceBox, S.shortLine, lineMat, Y));
+    squashGroup.add(makeLineOnGround(-hw + S.serviceBox, S.shortLine, -hw + S.serviceBox, S.shortLine + S.serviceBox, lineMat, Y));
+    squashGroup.add(makeLineOnGround(-hw, S.shortLine + S.serviceBox, -hw + S.serviceBox, S.shortLine + S.serviceBox, lineMat, Y));
+
+    squashGroup.add(makeLineOnGround(hw - S.serviceBox, S.shortLine, hw, S.shortLine, lineMat, Y));
+    squashGroup.add(makeLineOnGround(hw - S.serviceBox, S.shortLine, hw - S.serviceBox, S.shortLine + S.serviceBox, lineMat, Y));
+    squashGroup.add(makeLineOnGround(hw - S.serviceBox, S.shortLine + S.serviceBox, hw, S.shortLine + S.serviceBox, lineMat, Y));
+
+    // Outer walls as line edges
+    const wallEdge = 0x3b82f6;
+    // Front wall bottom
+    squashGroup.add(makeLine([new THREE.Vector3(-hw, 0, 0), new THREE.Vector3(hw, 0, 0)], wallEdge));
+    // Front wall top
+    squashGroup.add(makeLine([new THREE.Vector3(-hw, S.frontWallHeight, 0), new THREE.Vector3(hw, S.frontWallHeight, 0)], wallEdge));
+    // Front wall sides
+    squashGroup.add(makeLine([new THREE.Vector3(-hw, 0, 0), new THREE.Vector3(-hw, S.frontWallHeight, 0)], wallEdge));
+    squashGroup.add(makeLine([new THREE.Vector3(hw, 0, 0), new THREE.Vector3(hw, S.frontWallHeight, 0)], wallEdge));
+    // Floor perimeter
+    squashGroup.add(makeLineOnGround(-hw, 0, hw, 0, wallEdge, Y));           // front edge
+    squashGroup.add(makeLineOnGround(-hw, S.length, hw, S.length, wallEdge, Y)); // back edge
+    squashGroup.add(makeLineOnGround(-hw, 0, -hw, S.length, wallEdge, Y));   // left edge
+    squashGroup.add(makeLineOnGround(hw, 0, hw, S.length, wallEdge, Y));     // right edge
+    // Service line on front wall (horizontal line at 1.78m)
+    squashGroup.add(makeLine([
+        new THREE.Vector3(-hw, S.serviceLineHeight, 0),
+        new THREE.Vector3(hw, S.serviceLineHeight, 0)
+    ], 0x60a5fa));
+
+    // Tin on front wall (red strip at bottom 0.48m)
+    const tinGeom = new THREE.PlaneGeometry(S.width, S.tinHeight);
+    const tinMat = new THREE.MeshStandardMaterial({ color: 0xef4444, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+    const tin = new THREE.Mesh(tinGeom, tinMat);
+    tin.position.set(0, S.tinHeight / 2, -0.001);
+    squashGroup.add(tin);
+    // Tin top line
+    squashGroup.add(makeLine([
+        new THREE.Vector3(-hw, S.tinHeight, 0),
+        new THREE.Vector3(hw, S.tinHeight, 0)
+    ], 0xef4444));
+
+    updateSquashPosition();
+}
+
+function updateSquashPosition() {
+    squashGroup.position.set(state.squashOffsetX, 0, state.squashFrontWallZ);
+}
+
+// ==================== SERVE TRAJECTORY (physics-based) ====================
+
+// Simulate trajectory with gravity, drag, and Magnus (topspin) force.
+// pos = {x, y, z}, vel = {x, y, z}, spinRPM = topspin rpm
+// Returns array of {x, y, z} points until ball hits ground (y<=0) or exceeds maxDist.
+function simulateTrajectory(pos, vel, spinRPM) {
+    const dt = 0.0005; // time step (s) — small for accuracy
+    const maxSteps = 200000;
+    const points = [{ x: pos.x, y: pos.y, z: pos.z }];
+
+    let px = pos.x, py = pos.y, pz = pos.z;
+    let vx = vel.x, vy = vel.y, vz = vel.z;
+
+    // Spin angular velocity (rad/s) — topspin around the -X-axis (lateral)
+    // Topspin means the ball rotates so the top moves forward (toward net)
+    // In our coord system (ball goes -Z), spin axis = -X for topspin
+    const omega = spinRPM * 2 * Math.PI / 60; // rad/s
+
+    const halfRhoA = 0.5 * AIR.density * BALL.area;
+
+    for (let i = 0; i < maxSteps; i++) {
+        const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+        if (speed < 0.01) break;
+
+        // Drag force: F_D = -0.5 * CD * rho * A * v * v_vec
+        const dragMag = halfRhoA * BALL.CD * speed;
+        const ax_drag = -dragMag * vx / BALL.mass;
+        const ay_drag = -dragMag * vy / BALL.mass;
+        const az_drag = -dragMag * vz / BALL.mass;
+
+        // Magnus force: F_M = CL * 0.5 * rho * A * v^2 * (omega_hat x v_hat)
+        // For topspin on a serve, the ball's top surface moves forward (toward net).
+        // In our coordinate system (ball travels in -Z direction toward net),
+        // the topspin spin axis points along -X: omega_vec = (-omega, 0, 0)
+        // omega_hat x v_hat = (-1,0,0) x (vx,vy,vz)/speed = (0, vz/speed, -vy/speed)
+        // When vz < 0 (toward net) and vy < 0 (downward), this gives:
+        //   ay_magnus < 0 (downward) — topspin pushes ball down (correct)
+        //   az_magnus > 0 — but small; topspin slightly decelerates horizontal travel
+        // CL scales with spin parameter S = r*omega/v
+        const spinParam = BALL.radius * omega / speed;
+        const CL_eff = 1.5 * spinParam; // linear approximation from measurements
+        const magnusMag = halfRhoA * CL_eff * speed * speed / BALL.mass;
+        // Cross product (omega_hat x v_hat): (-1,0,0) x (vx,vy,vz)/speed = (0, vz/speed, -vy/speed)
+        const ax_magnus = 0;
+        const ay_magnus = magnusMag * (vz / speed);
+        const az_magnus = magnusMag * (-vy / speed);
+
+        // Total acceleration
+        const ax = ax_drag + ax_magnus;
+        const ay = -GRAVITY + ay_drag + ay_magnus;
+        const az = az_drag + az_magnus;
+
+        // Euler integration
+        vx += ax * dt;
+        vy += ay * dt;
+        vz += az * dt;
+        px += vx * dt;
+        py += vy * dt;
+        pz += vz * dt;
+
+        points.push({ x: px, y: py, z: pz });
+
+        // Stop if ball hits ground
+        if (py <= 0) {
+            // Interpolate to exact ground level
+            const prev = points[points.length - 2];
+            if (prev.y > 0) {
+                const frac = prev.y / (prev.y - py);
+                points[points.length - 1] = {
+                    x: prev.x + frac * (px - prev.x),
+                    y: 0,
+                    z: prev.z + frac * (pz - prev.z),
+                };
+            }
+            break;
+        }
+    }
+    return points;
+}
+
+// Find the launch angle that makes the ball land at targetPt while clearing the net
+// by at least minClearance meters. Uses bisection on the vertical launch angle.
+// Returns angle in radians (negative = below horizontal).
+function findLaunchAngle(contactPt, targetPt, speed, spinRPM, minClearance) {
+    const dx = targetPt.x - contactPt.x;
+    const dz = targetPt.z - contactPt.z;
+    const horizDist = Math.sqrt(dx * dx + dz * dz);
+    const hx = dx / horizDist;
+    const hz = dz / horizDist;
+
+    // First: find angle that hits the landing target (bisect on horizontal distance)
+    let alphaLow = -Math.PI / 2 + 0.01;
+    let alphaHigh = Math.PI / 4;
+
+    for (let iter = 0; iter < 60; iter++) {
+        const alpha = (alphaLow + alphaHigh) / 2;
+        const vHoriz = speed * Math.cos(alpha);
+        const vVert = speed * Math.sin(alpha);
+        const vel = { x: vHoriz * hx, y: vVert, z: vHoriz * hz };
+
+        const pts = simulateTrajectory({ ...contactPt }, vel, spinRPM);
+        const lastPt = pts[pts.length - 1];
+        const landDx = lastPt.x - contactPt.x;
+        const landDz = lastPt.z - contactPt.z;
+        const landHorizDist = landDx * hx + landDz * hz;
+
+        if (landHorizDist < horizDist) {
+            alphaLow = alpha;
+        } else {
+            alphaHigh = alpha;
+        }
+    }
+
+    let bestAlpha = (alphaLow + alphaHigh) / 2;
+
+    // Check net clearance for this angle
+    const vH = speed * Math.cos(bestAlpha);
+    const vV = speed * Math.sin(bestAlpha);
+    const testPts = simulateTrajectory({ ...contactPt }, { x: vH * hx, y: vV, z: vH * hz }, spinRPM);
+    let netY = null;
+    for (let i = 1; i < testPts.length; i++) {
+        if ((testPts[i - 1].z >= 0 && testPts[i].z <= 0) || (testPts[i - 1].z <= 0 && testPts[i].z >= 0)) {
+            const frac = testPts[i - 1].z / (testPts[i - 1].z - testPts[i].z);
+            netY = testPts[i - 1].y + frac * (testPts[i].y - testPts[i - 1].y);
+            break;
+        }
+    }
+
+    // If net clearance is insufficient, the angle we found is the best we can do
+    // (making it flatter would overshoot the landing, steeper would hit the net more)
+    // The user can always adjust the angle manually afterward.
+
+    return bestAlpha;
+}
+
+// Reference to the wall intersection sphere for dragging
+let wallDotMesh = null;
+
+function updateTrajectory() {
+    // Clear old
+    while (trajectoryGroup.children.length) trajectoryGroup.remove(trajectoryGroup.children[0]);
+    wallDotMesh = null;
+
+    if (!state.servePoint) {
+        updateResultPanel(null);
+        document.getElementById('comp-clearance').textContent = '--';
+        return;
+    }
+
+    const S = SQUASH;
+
+    // Serve position: on the tennis baseline
+    const serveWorldX = state.servePoint.x;
+    const serveWorldZ = TENNIS.halfLength; // baseline
+
+    // Contact point in world coords
+    const standingReach = 1.32 * state.playerHeight;
+    const contactHeight = standingReach + 0.50 + state.jumpGain;
+
+    // Vertical marker at serve point
+    const markerGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(serveWorldX, 0, serveWorldZ),
+        new THREE.Vector3(serveWorldX, contactHeight, serveWorldZ)
+    ]);
+    const markerMat = new THREE.LineBasicMaterial({ color: 0xfbbf24, linewidth: 2 });
+    trajectoryGroup.add(new THREE.Line(markerGeom, markerMat));
+
+    // Contact sphere
+    const sphereGeom = new THREE.SphereGeometry(0.08, 16, 16);
+    const sphereMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.5 });
+    const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+    sphere.position.set(serveWorldX, contactHeight, serveWorldZ);
+    trajectoryGroup.add(sphere);
+
+    // Floor marker at serve position
+    const floorRing = new THREE.RingGeometry(0.15, 0.25, 32);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, side: THREE.DoubleSide });
+    const floorMarker = new THREE.Mesh(floorRing, floorMat);
+    floorMarker.rotation.x = -Math.PI / 2;
+    floorMarker.position.set(serveWorldX, 0.008, serveWorldZ);
+    trajectoryGroup.add(floorMarker);
+
+    // Use serve angle directly to compute trajectory
+    const alphaRad = state.serveAngle * Math.PI / 180; // degrees to radians
+
+    // Default serve direction: straight ahead (negative Z, toward net)
+    // If landing point exists, aim toward it horizontally; otherwise aim at center of service box
+    let hx = 0, hz = -1; // default: straight toward net
+    if (state.landingPoint) {
+        const dx = state.landingPoint.x - serveWorldX;
+        const dz = state.landingPoint.z - serveWorldZ;
+        const hDist = Math.sqrt(dx * dx + dz * dz);
+        if (hDist > 0.01) { hx = dx / hDist; hz = dz / hDist; }
+
+        // Landing marker
+        const landRing = new THREE.RingGeometry(0.15, 0.25, 32);
+        const landMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, side: THREE.DoubleSide });
+        const landMarker = new THREE.Mesh(landRing, landMat);
+        landMarker.rotation.x = -Math.PI / 2;
+        landMarker.position.set(state.landingPoint.x, 0.008, state.landingPoint.z);
+        trajectoryGroup.add(landMarker);
+    }
+
+    // Contact point
+    const contactPt = { x: serveWorldX, y: contactHeight, z: serveWorldZ };
+
+    // Initial velocity from angle
+    const vHoriz = state.serveSpeed * Math.cos(alphaRad);
+    const vVert = state.serveSpeed * Math.sin(alphaRad);
+    const vel = { x: vHoriz * hx, y: vVert, z: vHoriz * hz };
+
+    // Simulate full trajectory
+    const trajPts = simulateTrajectory(contactPt, vel, state.topspin);
+
+    // Downsample for rendering (every N points)
+    const step = Math.max(1, Math.floor(trajPts.length / 300));
+    const renderPts = [];
+    for (let i = 0; i < trajPts.length; i += step) {
+        const p = trajPts[i];
+        renderPts.push(new THREE.Vector3(p.x, p.y, p.z));
+    }
+    const last = trajPts[trajPts.length - 1];
+    const lastV = new THREE.Vector3(last.x, last.y, last.z);
+    if (renderPts.length === 0 || !renderPts[renderPts.length - 1].equals(lastV)) {
+        renderPts.push(lastV);
+    }
+
+    // Draw trajectory curve
+    if (renderPts.length >= 2) {
+        trajectoryGroup.add(makeLine(renderPts, 0xfbbf24, 2));
+    }
+
+    // Landing sphere
+    const lSphereGeom = new THREE.SphereGeometry(0.06, 16, 16);
+    const lSphereMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.3 });
+    const lSphere = new THREE.Mesh(lSphereGeom, lSphereMat);
+    lSphere.position.set(last.x, last.y, last.z);
+    trajectoryGroup.add(lSphere);
+
+    // Find where trajectory crosses the net plane (z=0)
+    let netCrossPoint = null;
+    for (let i = 1; i < trajPts.length; i++) {
+        const p0 = trajPts[i - 1];
+        const p1 = trajPts[i];
+        if ((p0.z >= 0 && p1.z <= 0) || (p0.z <= 0 && p1.z >= 0)) {
+            const frac = p0.z / (p0.z - p1.z);
+            netCrossPoint = {
+                x: p0.x + frac * (p1.x - p0.x),
+                y: p0.y + frac * (p1.y - p0.y),
+                z: 0,
+            };
+            break;
+        }
+    }
+
+    if (netCrossPoint) {
+        const netClearance = netCrossPoint.y - TENNIS.netHeightCenter;
+        const clearanceEl = document.getElementById('comp-clearance');
+        if (netClearance > 0) {
+            clearanceEl.textContent = `+${(netClearance * 100).toFixed(0)}cm`;
+            clearanceEl.style.color = '#22c55e';
+        } else {
+            clearanceEl.textContent = `${(netClearance * 100).toFixed(0)}cm (FAULT)`;
+            clearanceEl.style.color = '#ef4444';
+        }
+
+        // Net crossing marker
+        const netMarkerGeom = new THREE.SphereGeometry(0.06, 16, 16);
+        const netMarkerColor = netClearance > 0 ? 0x22c55e : 0xef4444;
+        const netMarkerMat = new THREE.MeshStandardMaterial({ color: netMarkerColor, emissive: netMarkerColor, emissiveIntensity: 0.3 });
+        const netMarkerMesh = new THREE.Mesh(netMarkerGeom, netMarkerMat);
+        netMarkerMesh.position.set(netCrossPoint.x, netCrossPoint.y, netCrossPoint.z);
+        trajectoryGroup.add(netMarkerMesh);
+    } else {
+        document.getElementById('comp-clearance').textContent = '--';
+    }
+
+    // Find where trajectory crosses the squash front wall plane
+    const frontWallWorldZ = state.squashFrontWallZ;
+    let wallCrossPoint = null;
+    for (let i = 1; i < trajPts.length; i++) {
+        const p0 = trajPts[i - 1];
+        const p1 = trajPts[i];
+        if ((p0.z >= frontWallWorldZ && p1.z <= frontWallWorldZ) ||
+            (p0.z <= frontWallWorldZ && p1.z >= frontWallWorldZ)) {
+            const frac = (frontWallWorldZ - p0.z) / (p1.z - p0.z);
+            wallCrossPoint = {
+                x: p0.x + frac * (p1.x - p0.x),
+                y: p0.y + frac * (p1.y - p0.y),
+                z: frontWallWorldZ,
+            };
+            break;
+        }
+    }
+
+    if (wallCrossPoint && wallCrossPoint.y > 0) {
+        // Intersection marker on front wall (DRAGGABLE)
+        const intSphereGeom = new THREE.SphereGeometry(0.12, 16, 16);
+        const intColor = wallCrossPoint.y >= S.serviceLineHeight ? 0x22c55e : 0xef4444;
+        const intSphereMat = new THREE.MeshStandardMaterial({ color: intColor, emissive: intColor, emissiveIntensity: 0.5 });
+        wallDotMesh = new THREE.Mesh(intSphereGeom, intSphereMat);
+        wallDotMesh.position.set(wallCrossPoint.x, wallCrossPoint.y, wallCrossPoint.z);
+        wallDotMesh.userData.isDraggable = true;
+        trajectoryGroup.add(wallDotMesh);
+
+        // Horizontal reference line at intersection height on front wall
+        const fwHW = S.width / 2;
+        trajectoryGroup.add(makeLine([
+            new THREE.Vector3(state.squashOffsetX - fwHW, wallCrossPoint.y, frontWallWorldZ),
+            new THREE.Vector3(state.squashOffsetX + fwHW, wallCrossPoint.y, frontWallWorldZ)
+        ], intColor));
+
+        // Label: height text using sprite
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = intColor === 0x22c55e ? '#22c55e' : '#ef4444';
+        ctx.font = 'bold 36px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${wallCrossPoint.y.toFixed(2)}m`, 128, 44);
+        const tex = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.position.set(state.squashOffsetX + fwHW + 0.8, wallCrossPoint.y, frontWallWorldZ);
+        sprite.scale.set(1.5, 0.4, 1);
+        trajectoryGroup.add(sprite);
+
+        updateResultPanel(wallCrossPoint.y);
+    } else {
+        updateResultPanel(null);
+    }
+}
+
+function updateResultPanel(wallHeight) {
+    const box = document.getElementById('result-box');
+    if (wallHeight === null || wallHeight === undefined) {
+        box.innerHTML = '<div style="color: var(--text-muted); font-size: 12px; font-style: italic;">Place serve position on baseline, then click where you want the ball to land</div>';
+        return;
+    }
+
+    const slHeight = SQUASH.serviceLineHeight;
+    const diff = wallHeight - slHeight;
+    const aboveBelow = diff >= 0 ? 'above' : 'below';
+    const diffClass = diff >= 0 ? 'above' : 'below';
+
+    box.innerHTML = `
+        <div class="result-main" style="color: ${diff >= 0 ? 'var(--success)' : 'var(--danger)'}">
+            ${wallHeight.toFixed(2)}m
+        </div>
+        <div class="result-detail">Ball crosses squash front wall at this height</div>
+        <div class="result-detail">Squash service line: ${slHeight}m</div>
+        <div class="result-detail">Tin: ${SQUASH.tinHeight}m</div>
+        <div class="result-diff ${diffClass}">
+            ${Math.abs(diff).toFixed(2)}m ${aboveBelow} service line
+        </div>
+    `;
+}
+
+// ==================== COMPUTED VALUES ====================
+function updateComputedValues() {
+    state.playerHeight = parseFloat(document.getElementById('player-height').value) / 100;
+    state.jumpGain = parseFloat(document.getElementById('jump-gain').value) / 100;
+    state.serveSpeed = parseFloat(document.getElementById('serve-speed').value) / 3.6; // km/h -> m/s
+    state.topspin = parseFloat(document.getElementById('topspin').value);
+    state.minClearance = parseFloat(document.getElementById('min-clearance').value) / 100; // cm -> m
+    state.serveAngle = parseFloat(document.getElementById('serve-angle').value);
+
+    const standingReach = 1.32 * state.playerHeight;
+    const contactHeight = standingReach + 0.50 + state.jumpGain;
+
+    document.getElementById('comp-reach').textContent = standingReach.toFixed(2) + 'm';
+    document.getElementById('comp-contact').textContent = contactHeight.toFixed(2) + 'm';
+    document.getElementById('comp-velocity').textContent = state.serveSpeed.toFixed(1) + ' m/s';
+
+    updateTrajectory();
+}
+
+// ==================== RAYCASTING (two-step click) ====================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// Step 1: Invisible strip along the server's baseline
+const baselineStrip = new THREE.Mesh(
+    new THREE.PlaneGeometry(TENNIS.doublesWidth, 1.0),
+    new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+);
+baselineStrip.rotation.x = -Math.PI / 2;
+baselineStrip.position.set(0, 0.002, TENNIS.halfLength);
+scene.add(baselineStrip);
+
+// Visual baseline highlight
+const baselineHighlight = new THREE.Mesh(
+    new THREE.PlaneGeometry(TENNIS.doublesWidth, 0.15),
+    new THREE.MeshStandardMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+);
+baselineHighlight.rotation.x = -Math.PI / 2;
+baselineHighlight.position.set(0, 0.007, TENNIS.halfLength);
+tennisGroup.add(baselineHighlight);
+
+// Step 2: Invisible floor for opponent's side (z < 0, i.e. far side of net)
+const opponentFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(TENNIS.doublesWidth, TENNIS.halfLength),
+    new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+);
+opponentFloor.rotation.x = -Math.PI / 2;
+opponentFloor.position.set(0, 0.002, -TENNIS.halfLength / 2);
+scene.add(opponentFloor);
+
+const hintEl = document.getElementById('click-hint');
+
+// When user clicks landing spot, compute the required angle and update the angle input
+function computeAngleForLanding() {
+    if (!state.servePoint || !state.landingPoint) return;
+
+    const standingReach = 1.32 * state.playerHeight;
+    const contactHeight = standingReach + 0.50 + state.jumpGain;
+    const contactPt = { x: state.servePoint.x, y: contactHeight, z: TENNIS.halfLength };
+    const targetPt = { x: state.landingPoint.x, y: 0, z: state.landingPoint.z };
+
+    const alphaRad = findLaunchAngle(contactPt, targetPt, state.serveSpeed, state.topspin, state.minClearance);
+    const alphaDeg = alphaRad * 180 / Math.PI;
+
+    // Update state and input field
+    state.serveAngle = parseFloat(alphaDeg.toFixed(1));
+    document.getElementById('serve-angle').value = state.serveAngle;
+
+    updateTrajectory();
+}
+
+renderer.domElement.addEventListener('click', (e) => {
+    if (state.draggingWallDot || state.justFinishedDrag) {
+        state.justFinishedDrag = false;
+        return; // don't place points while dragging or right after a drag ends
+    }
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    if (!state.servePoint) {
+        // Step 1: pick serve position on baseline
+        const hits = raycaster.intersectObject(baselineStrip, false);
+        if (hits.length > 0) {
+            const hw = TENNIS.singlesWidth / 2;
+            const clampedX = Math.max(-hw, Math.min(hw, hits[0].point.x));
+            state.servePoint = { x: clampedX };
+            state.landingPoint = null;
+            hintEl.textContent = 'Step 2: Click on the opponent\'s court where you want the ball to land';
+            hintEl.style.opacity = '1';
+            updateTrajectory();
+        }
+    } else if (!state.landingPoint) {
+        // Step 2: pick landing target on opponent's side — compute angle
+        const hits = raycaster.intersectObject(opponentFloor, false);
+        if (hits.length > 0) {
+            const pt = hits[0].point;
+            const hw = TENNIS.singlesWidth / 2;
+            const clampedX = Math.max(-hw, Math.min(hw, pt.x));
+            const clampedZ = Math.max(-TENNIS.halfLength, Math.min(0, pt.z));
+            state.landingPoint = { x: clampedX, z: clampedZ };
+            hintEl.textContent = 'Adjust parameters freely, or drag the red dot on the wall';
+            setTimeout(() => { hintEl.style.opacity = '0'; }, 4000);
+            computeAngleForLanding();
+        }
+    } else {
+        // Both placed: clicking baseline resets serve, clicking opponent side changes target
+        const baseHits = raycaster.intersectObject(baselineStrip, false);
+        if (baseHits.length > 0) {
+            const hw = TENNIS.singlesWidth / 2;
+            const clampedX = Math.max(-hw, Math.min(hw, baseHits[0].point.x));
+            state.servePoint = { x: clampedX };
+            computeAngleForLanding();
+            return;
+        }
+        const courtHits = raycaster.intersectObject(opponentFloor, false);
+        if (courtHits.length > 0) {
+            const pt = courtHits[0].point;
+            const hw = TENNIS.singlesWidth / 2;
+            state.landingPoint = {
+                x: Math.max(-hw, Math.min(hw, pt.x)),
+                z: Math.max(-TENNIS.halfLength, Math.min(0, pt.z))
+            };
+            computeAngleForLanding();
+        }
+    }
+});
+
+// ==================== WALL DOT DRAGGING ====================
+// Drag the intersection dot up/down on the front wall to adjust serve angle
+const dragPlane = new THREE.Plane();
+const dragIntersect = new THREE.Vector3();
+
+renderer.domElement.addEventListener('mousedown', (e) => {
+    if (!wallDotMesh) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    const hits = raycaster.intersectObject(wallDotMesh, false);
+    if (hits.length > 0) {
+        state.draggingWallDot = true;
+        controls.enabled = false;
+        // Set up a vertical plane at the front wall for dragging
+        dragPlane.setFromNormalAndCoplanarPoint(
+            new THREE.Vector3(0, 0, 1), // front wall faces Z
+            wallDotMesh.position
+        );
+        e.preventDefault();
+    }
+});
+
+renderer.domElement.addEventListener('mousemove', (e) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    if (state.draggingWallDot && wallDotMesh) {
+        // Dragging: compute new wall height from mouse position
+        if (raycaster.ray.intersectPlane(dragPlane, dragIntersect)) {
+            const newY = Math.max(SQUASH.tinHeight, Math.min(SQUASH.frontWallHeight, dragIntersect.y));
+
+            if (!state.servePoint) return;
+
+            const standingReach = 1.32 * state.playerHeight;
+            const contactHeight = standingReach + 0.50 + state.jumpGain;
+            const serveWorldX = state.servePoint.x;
+            const serveWorldZ = TENNIS.halfLength;
+
+            let hx = 0, hz = -1;
+            if (state.landingPoint) {
+                const dx = state.landingPoint.x - serveWorldX;
+                const dz = state.landingPoint.z - serveWorldZ;
+                const hDist = Math.sqrt(dx * dx + dz * dz);
+                if (hDist > 0.01) { hx = dx / hDist; hz = dz / hDist; }
+            }
+
+            const contactPt = { x: serveWorldX, y: contactHeight, z: serveWorldZ };
+            const frontWallWorldZ = state.squashFrontWallZ;
+
+            // Bisect for the angle that gives this wall height
+            let aLow = -Math.PI / 2 + 0.01;
+            let aHigh = Math.PI / 4;
+
+            for (let iter = 0; iter < 40; iter++) {
+                const aMid = (aLow + aHigh) / 2;
+                const vH = state.serveSpeed * Math.cos(aMid);
+                const vV = state.serveSpeed * Math.sin(aMid);
+                const pts = simulateTrajectory({ ...contactPt }, { x: vH * hx, y: vV, z: vH * hz }, state.topspin);
+
+                let crossY = null;
+                for (let i = 1; i < pts.length; i++) {
+                    const p0 = pts[i - 1], p1 = pts[i];
+                    if ((p0.z >= frontWallWorldZ && p1.z <= frontWallWorldZ) ||
+                        (p0.z <= frontWallWorldZ && p1.z >= frontWallWorldZ)) {
+                        const frac = (frontWallWorldZ - p0.z) / (p1.z - p0.z);
+                        crossY = p0.y + frac * (p1.y - p0.y);
+                        break;
+                    }
+                }
+
+                if (crossY === null || crossY < newY) {
+                    aLow = aMid;
+                } else {
+                    aHigh = aMid;
+                }
+            }
+
+            const bestAngle = (aLow + aHigh) / 2;
+            state.serveAngle = parseFloat((bestAngle * 180 / Math.PI).toFixed(1));
+            document.getElementById('serve-angle').value = state.serveAngle;
+            updateTrajectory();
+        }
+    } else {
+        // Not dragging: update cursor for hover feedback
+        if (!wallDotMesh) { renderer.domElement.style.cursor = ''; return; }
+        const hits = raycaster.intersectObject(wallDotMesh, false);
+        renderer.domElement.style.cursor = hits.length > 0 ? 'ns-resize' : '';
+    }
+});
+
+renderer.domElement.addEventListener('mouseup', () => {
+    if (state.draggingWallDot) {
+        state.draggingWallDot = false;
+        state.justFinishedDrag = true; // suppress the click event that follows mouseup
+        controls.enabled = true;
+    }
+});
+
+renderer.domElement.addEventListener('mouseleave', () => {
+    if (state.draggingWallDot) {
+        state.draggingWallDot = false;
+        controls.enabled = true;
+    }
+});
+
+// ==================== SQUASH COURT MOVEMENT ====================
+function moveSquash(dx, dz) {
+    state.squashOffsetX += dx;
+    state.squashFrontWallZ += dz;
+    updateSquashPosition();
+    updateTrajectory();
+}
+
+function setAlignment(preset) {
+    const centered = 0;
+    if (preset === 'midpoint') {
+        state.squashOffsetX = centered;
+        state.squashFrontWallZ = TENNIS.serviceLineZ / 2;
+    } else if (preset === 'net') {
+        state.squashOffsetX = centered;
+        state.squashFrontWallZ = 0;
+    } else if (preset === 'serviceline') {
+        state.squashOffsetX = centered;
+        state.squashFrontWallZ = TENNIS.serviceLineZ;
+    } else if (preset === 'baseline') {
+        state.squashOffsetX = centered;
+        state.squashFrontWallZ = TENNIS.halfLength - SQUASH.length;
+    }
+    updateSquashPosition();
+    updateTrajectory();
+}
+
+document.getElementById('move-fwd').addEventListener('click', () => moveSquash(0, -STEP));
+document.getElementById('move-back').addEventListener('click', () => moveSquash(0, STEP));
+document.getElementById('move-left').addEventListener('click', () => moveSquash(-STEP, 0));
+document.getElementById('move-right').addEventListener('click', () => moveSquash(STEP, 0));
+document.getElementById('move-reset').addEventListener('click', () => setAlignment('net'));
+
+document.getElementById('alignment-select').addEventListener('change', (e) => {
+    setAlignment(e.target.value);
+});
+
+// Keyboard arrows
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'ArrowUp') { moveSquash(0, -STEP); e.preventDefault(); }
+    if (e.key === 'ArrowDown') { moveSquash(0, STEP); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { moveSquash(-STEP, 0); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { moveSquash(STEP, 0); e.preventDefault(); }
+});
+
+// ==================== CAMERA PRESETS ====================
+function animateCamera(pos, target, duration) {
+    const startPos = camera.position.clone();
+    const startTarget = controls.target.clone();
+    const endPos = new THREE.Vector3(...pos);
+    const endTarget = new THREE.Vector3(...target);
+    const startTime = performance.now();
+
+    function step(now) {
+        const t = Math.min((now - startTime) / duration, 1);
+        const e = t * (2 - t);
+        camera.position.lerpVectors(startPos, endPos, e);
+        controls.target.lerpVectors(startTarget, endTarget, e);
+        controls.update();
+        if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+document.getElementById('cam-default').addEventListener('click', () => {
+    animateCamera([12, 12, 20], [0, 1, 5], 600);
+});
+document.getElementById('cam-side').addEventListener('click', () => {
+    animateCamera([18, 5, 5], [0, 2, 5], 600);
+});
+document.getElementById('cam-top').addEventListener('click', () => {
+    animateCamera([0, 30, 5], [0, 0, 5], 600);
+});
+document.getElementById('cam-behind').addEventListener('click', () => {
+    animateCamera([0, 4, 18], [0, 2, 0], 600);
+});
+
+// ==================== LAYER TOGGLES ====================
+document.getElementById('toggle-tennis').addEventListener('change', (e) => {
+    tennisGroup.visible = e.target.checked;
+});
+document.getElementById('toggle-squash').addEventListener('change', (e) => {
+    squashGroup.visible = e.target.checked;
+});
+document.getElementById('toggle-trajectory').addEventListener('change', (e) => {
+    trajectoryGroup.visible = e.target.checked;
+});
+
+// ==================== INPUT LISTENERS ====================
+['player-height', 'jump-gain', 'serve-speed', 'topspin', 'min-clearance', 'serve-angle'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateComputedValues);
+});
+
+// ==================== RESIZE ====================
+window.addEventListener('resize', () => {
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+});
+
+// ==================== INIT & ANIMATE ====================
+buildTennisCourt();
+buildSquashCourt();
+updateComputedValues();
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
